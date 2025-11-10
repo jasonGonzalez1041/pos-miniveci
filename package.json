@@ -10,8 +10,10 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "pages:build": "npx @cloudflare/next-on-pages@1",
-    "pages:deploy": "npx wrangler pages deploy .vercel/output/static --project-name=pos-miniveci"
+    "build:cf": "next build",
+    "pages:deploy": "npx wrangler pages deploy out --project-name=pos-miniveci",
+    "preview": "npx wrangler pages dev out --port 3001",
+    "verify:cf": "ts-node scripts/verify-cloudflare-deployment.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.15.15",

@@ -15,7 +15,7 @@
 
 # next.js
 /.next/
-/out/
+# /out/ # Comentado porque 'out' es necesario para Cloudflare Pages deployment
 
 # production
 /build
