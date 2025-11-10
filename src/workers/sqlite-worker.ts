@@ -131,7 +131,7 @@ function isValidScriptPath(path: string): path is ValidatedScriptPath {
 }
 
 /**
- * Sanitizes SQL queries to prevent injection attacks and unauthorized operations
+ * Sanitizes SQL queries to prevent injection attacks and unauthorized operations.
  * 
  * This function performs comprehensive SQL sanitization by removing dangerous
  * patterns and validating against allowed operation types. It combines runtime
@@ -157,7 +157,8 @@ function isValidScriptPath(path: string): path is ValidatedScriptPath {
  * ```
  * 
  * @security
- * - Removes SQL comment patterns (-- and /* */)
+ * Security measures implemented:
+ * - Removes SQL comment patterns (double dash and block comments)
  * - Strips trailing semicolons to prevent statement chaining
  * - Validates against whitelist of allowed SQL operations
  * - Prevents data definition language (DDL) attacks
@@ -170,7 +171,7 @@ function sanitizeSQL(sql: string): SafeSQL {
   // Remove potential injection patterns
   const cleaned = sql.trim()
     .replace(/;\s*--.*$/gm, '') // Remove SQL comments
-    .replace(/;\s*\/\*.*?\*\//gs, '') // Remove block comments
+    .replace(/;\s*\/\*[\s\S]*?\*\//gs, '') // Remove block comments
     .replace(/;\s*$/g, ''); // Remove trailing semicolons
   
   // Validate against allowed patterns
@@ -293,7 +294,7 @@ async function secureLoadScript(scriptPath: string): Promise<void> {
     
     try {
       // importScripts executes in worker scope but doesn't allow arbitrary eval
-      importScripts(scriptUrl);
+      (self as any).importScripts(scriptUrl);
       
       // STEP 6: Validate expected globals were created
       for (const globalName of scriptConfig.requiredGlobals) {
