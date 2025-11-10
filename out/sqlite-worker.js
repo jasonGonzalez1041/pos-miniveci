@@ -1,7 +1,8 @@
 // SQLite WASM Worker with sql.js + IndexedDB persistence
 // This worker handles all SQLite operations with persistent storage
 
-importScripts('https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/sql-wasm.js');
+// Use local sql.js for Cloudflare Pages compatibility (COOP/COEP headers)
+importScripts('/sql-wasm.js');
 
 const log = (...args) => console.log('[SQLite Worker]', ...args);
 const error = (...args) => console.error('[SQLite Worker]', ...args);
@@ -71,8 +72,9 @@ const initializeSQLite = async () => {
     log('Loading and initializing SQL.js...');
 
     // initSqlJs is globally available after importScripts
+    // Use local files for WASM to comply with COOP/COEP headers
     const SQL = await initSqlJs({
-      locateFile: file => `https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/${file}`
+      locateFile: file => `/${file}`
     });
 
     // Try to load existing database
