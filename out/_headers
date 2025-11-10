@@ -1,0 +1,23 @@
+# Headers para SQLite WASM y Cloudflare Pages
+# Estos headers son necesarios para habilitar SharedArrayBuffer
+
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+/sqlite-worker.js
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-origin
+  Cache-Control: public, max-age=31536000, immutable
+  Content-Type: application/javascript; charset=utf-8
+
+/*.wasm
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-origin
+  Cache-Control: public, max-age=31536000, immutable
+  Content-Type: application/wasm
+
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
