@@ -5,15 +5,26 @@
  */
 
 const { execSync } = require('child_process');
-const { readFileSync, writeFileSync, existsSync, mkdirSync } = require('fs');
+const { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } = require('fs');
 const { join } = require('path');
 
 function compileAndReplaceWorker() {
   console.log('[BUILD] Compiling secure SQLite worker...');
   
   try {
-    // Create output directory
+    // Clean previous builds to prevent security violations
+    console.log('[BUILD] 🧹 Cleaning previous builds...');
     const tempDir = join(process.cwd(), 'temp-worker');
+    const outWorker = join(process.cwd(), 'out', 'sqlite-worker.js');
+    
+    if (existsSync(tempDir)) {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+    if (existsSync(outWorker)) {
+      rmSync(outWorker, { force: true });
+    }
+    
+    // Create output directory
     if (!existsSync(tempDir)) {
       mkdirSync(tempDir, { recursive: true });
     }
@@ -49,8 +60,28 @@ function compileAndReplaceWorker() {
     const outputPath = join(process.cwd(), 'public', 'sqlite-worker.js');
     writeFileSync(outputPath, finalCode);
     
-    // Verify security
-    if (finalCode.includes('eval(')) {
+    // Verify security - Check for actual eval() usage (not in comments/docs)
+    console.log('[BUILD] 🔍 Scanning for security violations...');
+    const lines = finalCode.split('\n');
+    const vulnerableLines = [];
+    
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+      // Skip documentation comments, JSDoc, and security headers
+      if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) {
+        return;
+      }
+      // Check for actual eval() calls or eslint disables
+      if (trimmed.includes('eval(') || trimmed.includes('eslint-disable-next-line no-eval')) {
+        vulnerableLines.push({ line: index + 1, code: trimmed });
+      }
+    });
+    
+    if (vulnerableLines.length > 0) {
+      console.error('SECURITY VIOLATION: eval() found in executable code!');
+      vulnerableLines.forEach(({ line, code }) => {
+        console.error(`Line ${line}: ${code}`);
+      });
       throw new Error('SECURITY VIOLATION: eval() found in output!');
     }
     
@@ -58,8 +89,11 @@ function compileAndReplaceWorker() {
     console.log('[BUILD] ✅ No eval() usage detected');
     console.log('[BUILD] ✅ Security headers added');
     
-    // Cleanup
-    execSync(`rmdir /s /q temp-worker`, { stdio: 'ignore' });
+    // Cleanup temp directory
+    if (existsSync(tempDir)) {
+      rmSync(tempDir, { recursive: true, force: true });
+      console.log('[BUILD] 🧹 Temporary files cleaned');
+    }
     
   } catch (error) {
     console.error('[BUILD] ❌ Compilation failed:', error.message);
