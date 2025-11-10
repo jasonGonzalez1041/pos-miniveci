@@ -1,12 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  reactCompiler: true,
   output: 'export',
   trailingSlash: true,
+  skipTrailingSlashRedirect: true,
   images: {
     unoptimized: true
+  },
+  // Remove experimental features that might conflict with Cloudflare
+  experimental: {
+    esmExternals: false
   },
   async headers() {
     return [

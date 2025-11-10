@@ -1,13 +1,14 @@
 name = "pos-miniveci"
 compatibility_date = "2024-01-15"
 
+# Cloudflare Pages configuration
+pages_build_output_dir = "out"
+
+[build]
+command = "npm run build:cf"
+
 [env.production]
 compatibility_date = "2024-01-15"
 
 [env.preview]
 compatibility_date = "2024-01-15"
-
-# Cloudflare Pages configuration
-# Build command: npm run build:cf
-# Build output directory: out
-# Node.js version: 20
