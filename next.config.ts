@@ -7,10 +7,6 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true
   },
-  // Remove experimental features that might conflict with Cloudflare
-  experimental: {
-    esmExternals: false
-  },
   async headers() {
     return [
       {
