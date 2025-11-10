@@ -186,3 +186,4 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 *Desarrollado para comerciantes que necesitan un sistema de ventas confiable y moderno* ⭐
 
 
+# Trigger Cloudflare Pages rebuild
