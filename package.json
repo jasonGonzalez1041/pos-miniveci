@@ -3,8 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/dev-server.js",
+    "dev:next": "next dev",
+    "build": "next build", 
+    "postbuild": "cp public/_headers out/_headers 2>/dev/null || copy public\\_headers out\\_headers >NUL 2>&1 || true",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
