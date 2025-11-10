@@ -1,11 +1,41 @@
 // SQLite WASM Worker with sql.js + IndexedDB persistence
 // This worker handles all SQLite operations with persistent storage
 
-// Use local sql.js for Cloudflare Pages compatibility (COOP/COEP headers)
-importScripts('/sql-wasm.js');
-
 const log = (...args) => console.log('[SQLite Worker]', ...args);
 const error = (...args) => console.error('[SQLite Worker]', ...args);
+
+// Load sql.js using fetch + eval (compatible with Cloudflare Pages Workers)
+async function loadSqlJs() {
+  try {
+    log('Loading sql-wasm.js from /sql-wasm.js...');
+    const response = await fetch('/sql-wasm.js');
+
+    if (!response.ok) {
+      throw new Error(`Failed to load sql-wasm.js: ${response.status} ${response.statusText}`);
+    }
+
+    const code = await response.text();
+    log('sql-wasm.js fetched successfully, size:', code.length, 'bytes');
+
+    // Execute the code in global worker scope
+    // eslint-disable-next-line no-eval
+    eval(code);
+
+    // Verify initSqlJs is now available
+    if (typeof self.initSqlJs !== 'function') {
+      throw new Error('initSqlJs not defined after loading sql-wasm.js');
+    }
+
+    log('sql.js loaded successfully, initSqlJs available');
+  } catch (err) {
+    error('Failed to load sql.js:', err);
+    self.postMessage({
+      type: 'error',
+      error: `SQL.js load failed: ${err instanceof Error ? err.message : String(err)}`
+    });
+    throw err;
+  }
+}
 
 const DB_NAME = 'pos-miniveci-db';
 const DB_VERSION = 1;
@@ -69,12 +99,19 @@ async function saveDatabase() {
 // Initialize SQLite
 const initializeSQLite = async () => {
   try {
-    log('Loading and initializing SQL.js...');
+    // Load sql.js first
+    await loadSqlJs();
 
-    // initSqlJs is globally available after importScripts
+    log('Initializing SQL.js with WASM...');
+
+    // initSqlJs is globally available after loadSqlJs()
     // Use local files for WASM to comply with COOP/COEP headers
     const SQL = await initSqlJs({
-      locateFile: file => `/${file}`
+      locateFile: file => {
+        const path = `/${file}`;
+        log(`Locating WASM file: ${file} -> ${path}`);
+        return path;
+      }
     });
 
     // Try to load existing database
