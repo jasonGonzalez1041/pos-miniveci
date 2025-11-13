@@ -1,49 +1,130 @@
-# AGENTS.md - POS MiniVeci Development Guide
+# CONTEXTO DEL PROYECTO
+
+Estoy desarrollando **VeciPOS**, un sistema POS (Point of Sale) local-first para pequeños negocios en Latinoamérica. Este es un proyecto CRÍTICO donde la **VELOCIDAD es MÁXIMA PRIORIDAD**.
+
+## PRIORIDADES DEL NEGOCIO (en orden):
+1. **POS (VeciPOS)** - PRIORIDAD #1 - Debe estar listo lo más rápido posible
+2. **APP Móvil** - En desarrollo paralelo (Cristian)
+3. **Tienda Online** - Se desarrollará después del POS
+
+**IMPORTANTE**: El cliente (Kevin) enfatiza que necesita el POS funcionando PRIMERO porque:
+- Sin POS no hay inventario que sincronizar
+- La tienda online depende del inventario del POS
+- Los clientes necesitan facturar RÁPIDO (competencia "Desing" es muy lenta)
+
+## ECOSISTEMA DE PRODUCTOS
+
+### VeciPOS (POS System)
+- **Dominio**: posveci.com (producción) / pos-veci.vercel.app (desarrollo)
+- **Propósito**: Sistema de punto de venta para negocios físicos
+- **Características clave**:
+  - Offline-first (funciona sin internet)
+  - Facturación instantánea (sin tiempos de carga)
+  - Gestión de inventario en tiempo real
+  - Sincronización automática con la nube
+
+### Tienda Online
+- **Dominio**: shop.posveci.com o posveci.com/tienda (TBD)
+- **Propósito**: E-commerce que consume inventario del POS
+- **Estado**: Pendiente, se desarrollará después del POS
+
+### APP Móvil
+- **Responsable**: Cristian
+- **Integración**: Comparte BD con POS
+
+## MERCADO OBJETIVO
+- **Región**: Toda Latinoamérica
+- **Rubros**:
+  - Minimarkets
+  - Botillerías (licorerías)
+  - Carnicerías
+  - Panaderías
+- **Nombre "Veci"**: Viene de "Vecino" - palabra universal en Latinoamérica
+
+---
+
+# AGENTS.md - VeciPOS Development Guide
 
 ## Project Overview
 
-**POS MiniVeci** is a local-first Point of Sale system for small businesses built with Next.js 15, TypeScript, and SQLite. The system works completely offline with automatic synchronization when online.
+**VeciPOS** is a local-first Point of Sale system for small businesses in Latin America, built with Next.js 15, TypeScript, and libSQL. The system works completely offline with automatic synchronization when online.
 
 ### Key Technologies
 - **Frontend**: Next.js 15 + React 19 + TypeScript 5+ (strict mode)
-- **UI Framework**: Tailwind CSS + shadcn/ui components (New York style)
-- **Database**: Dual database architecture (SQLite local + Turso PostgreSQL cloud)
+- **UI Framework**: Tailwind CSS + shadcn/ui components
+- **Database**: Dual database architecture
+  - **Client**: libSQL (WebAssembly-based SQLite for browser)
+  - **Backend**: Turso (managed libSQL cloud database)
 - **ORM**: Drizzle ORM with type-safe operations
-- **Image Storage**: Cloudflare R2 with multi-size optimization
 - **Testing**: Vitest + Testing Library + MSW for mocking
-- **Deployment**: Cloudflare Pages with static export
-- **Build**: Static export (`output: 'export'`) for edge deployment
-- **Authentication**: bcryptjs with role-based access control
-- **Offline Support**: IndexedDB + Web Workers + SQLite WASM
+- **Deployment**: Vercel (optimal Next.js integration) + Cloudflare R2 storage
+- **Build**: Hybrid - Static where possible, dynamic for real-time features
 
 ## Architecture Patterns
 
 ### Database Strategy
-- **Local-First**: SQLite via WebAssembly for offline operations
-- **Cloud Sync**: PostgreSQL (Turso) for backup and multi-device sync
+- **Local-First**: libSQL via WebAssembly for offline operations in browser
+- **Cloud Sync**: Turso (managed libSQL) for backup and multi-device sync
 - **Dual Operations**: All database operations use `dual-db-operations.ts` for automatic local + cloud persistence
 - **Conflict Resolution**: Last-write-wins with timestamp-based resolution
 - **Soft Deletes**: Use `deletedAt` timestamp instead of hard deletes
+- **Performance**: Optimized for **instant reads** - no loading delays on critical operations (checkout, inventory lookup)
+
+### Performance Requirements (CRITICAL)
+**Speed is the #1 differentiator** - Our competitor "Desing" is slow; we must be instant.
+
+#### Critical Performance Targets:
+- **Checkout flow**: < 100ms from scan to display
+- **Product search**: < 50ms response time
+- **Invoice generation**: Instant (< 200ms)
+- **UI interactions**: 60fps minimum, no jank
+- **Initial load**: < 2s on average hardware
+- **Offli/**: 0ms network delay (local-first)
+
+#### Optimization Strategies:
+- Aggressive memoization with React.memo
+- Virtual scrolling for large product lists
+- Indexed product search (Fuse.js or similar)
+- Preload common operations
+- Web Workers for heavy calculations
+- Optimistic UI updates (show before sync)
+- Keep hot data in memory cache
 
 ### File Structure Conventions
 ```
 src/
-├── app/                    # Next.js App Router
-│   ├── pos/               # POS-specific routes
-│   └── api/webhooks/      # WooCommerce webhook handlers
-├── components/            # Reusable components
-│   └── ui/               # shadcn/ui components (all 'use client')
-│       └── pos/          # POS-specific UI components
-├── lib/                  # Core utilities
-│   ├── db/               # Database layer
-│   ├── r2/               # Cloudflare R2 image handling
-│   └── services/         # Business logic services
-├── hooks/                # Custom React hooks
-├── workers/              # Web Workers for heavy operations
-└── __tests__/            # Test files (mirrors src structure)
+app/                    # Next.js App Router
+  (pos)/                # POS routes (grouped)
+    checkout/           # Checkout/billing flow
+    inventory/          # Inventory management
+    sales/              # Sales history
+  (shop)/               # Future: Online store routes
+  api/
+    sync/               # Turso sync endpoints
+    webhooks/           # External integrations
+components/
+  ui/
+    pos/                # POS-specific components
+    shared/             # Shared with future shop
+lib/
+  db/
+    libsql/             # Client-side libSQL setup
+    turso/              # Backend Turso connection
+    dual-ops.ts         # Dual database operations
+  r2/                   # Cloudflare R2 image handling
+  services/
+    pos/                # POS business logic
+    sync/               # Sync service
+hooks/
+  use-pos-cart.ts       # Shopping cart hook
+  use-inventory.ts      # Inventory operations
+workers/
+  sync.worker.ts        # Background sync
+  invoice.worker.ts     # Invoice generation
+__tests__/              # Test files (mirrors src structure)
 ```
 
-### TypeScript Guidelines
+## TypeScript Guidelines
 
 ### Strict Configuration
 - Always use TypeScript strict mode (`strict: true`)
@@ -51,12 +132,8 @@ src/
   - `noUncheckedIndexedAccess: true`
   - `exactOptionalPropertyTypes: true`
   - `noImplicitOverride: true`
-  - `verbatimModuleSyntax: true`
-  - `moduleDetection: "force"`
 - Use type inference over explicit typing when possible
 - Import types with `import type { }` for type-only imports
-- Target ES2022 with bundler module resolution
-- Never use `allowJs: false` - keep strict TypeScript only
 
 ### Database Types
 - Use Drizzle's inferred types from schema definitions
@@ -70,7 +147,7 @@ export type NewProduct = typeof products.$inferInsert;
 
 // ✅ Good - Properly typed operation
 async function getProducts(): Promise<Product[]> {
-  return await localDb.select().from(products);
+  return await libsqlClient.select().from(products);
 }
 ```
 
@@ -79,7 +156,7 @@ async function getProducts(): Promise<Product[]> {
 ### React Component Patterns
 - **Client Components**: Mark with `'use client'` at top of file
 - **Server Components**: Default - no client directive needed
-- **Memoization**: Use `React.memo` for expensive components
+- **Memoization**: Use `React.memo` for ALL POS components (performance critical)
 - **Hooks**: Extract complex logic to custom hooks
 
 ### UI Component Guidelines
@@ -87,13 +164,15 @@ async function getProducts(): Promise<Product[]> {
 - Use compound component pattern for complex UI
 - Implement proper accessibility (ARIA labels, keyboard navigation)
 - Use consistent spacing with Tailwind classes
+- **Keyboard shortcuts**: Essential for fast POS operation (F keys, number pad)
 
 ```tsx
-// ✅ Good - Memoized component with proper types
+// ✅ Good - Memoized POS component with keyboard support
 'use client';
 
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import type { Product } from '@/lib/db/schema';
+import { useHotkeys } from '@/hooks/use-hotkeys';
 
 interface ProductCardProps {
   product: Product;
@@ -104,7 +183,18 @@ export const ProductCard = memo(function ProductCard({
   product, 
   onAdd 
 }: ProductCardProps) {
-  // Component implementation
+  const handleAdd = useCallback(() => {
+    onAdd(product);
+  }, [product, onAdd]);
+
+  // F1 para agregar rápido
+  useHotkeys('F1', handleAdd);
+
+  return (
+    <div className="product-card">
+      {/* UI implementation */}
+    </div>
+  );
 });
 
 ProductCard.displayName = 'ProductCard';
@@ -112,150 +202,208 @@ ProductCard.displayName = 'ProductCard';
 
 ## Database Operations
 
-### Dual Database Pattern
+### Dual Database Pattern (libSQL + Turso)
+- **Client**: libSQL running in browser via WebAssembly
+- **Backend**: Turso (managed libSQL in the cloud)
 - Always use functions from `dual-db-operations.ts`
-- Never directly call `localDb` or `cloudDb` from components
+- Never directly call `libsqlClient` or `tursoClient` from components
 - Operations automatically handle local + cloud persistence
 - Include proper error handling for offline scenarios
 
 ```typescript
 // ✅ Good - Use dual operations
-import { insertProductDual } from '@/lib/db/dual-db-operations';
+import { insertProductDual } from '@/lib/db/dual-ops';
 
 const product = await insertProductDual({
-  name: 'Test Product',
-  price: 100,
-  stock: 10
+  name: 'Coca Cola 2L',
+  price: 2500, // CLP
+  stock: 10,
+  barcode: '7891234567890'
 });
 
 // ❌ Bad - Direct database access
-const product = await localDb.insert(products).values({...});
+const product = await libsqlClient.insert(products).values({...});
+```
+
+### Implementación de Operaciones Duales - MISMO CÓDIGO Drizzle
+**PRINCIPIO FUNDAMENTAL**: Usar el MISMO código de Drizzle ORM para ejecutar consultas en local (libSQL) y cloud (Turso). **NO duplicar sentencias SQL**.
+
+#### Ejemplo de Implementación Correcta:
+```typescript
+// lib/db/dual-ops.ts
+import { libsqlClient } from './libsql/client';
+import { tursoClient } from './turso/client';
+import { products } from './schema';
+import type { NewProduct, Product } from './schema';
+
+/**
+ * Ejecuta la MISMA operación Drizzle en ambas bases de datos
+ * @param operation - Función que recibe un cliente Drizzle y retorna una promesa
+ */
+async function executeDual<T>(
+  operation: (db: typeof libsqlClient) => Promise<T>
+): Promise<T> {
+  // Ejecutar en local PRIMERO (sincrónico para el usuario)
+  const localResult = await operation(libsqlClient);
+  
+  // Ejecutar en cloud en BACKGROUND (no bloquear UI)
+  operation(tursoClient).catch(err => {
+    console.error('Cloud sync failed, will retry:', err);
+    // Aquí va la lógica de retry queue
+  });
+  
+  return localResult;
+}
+
+/**
+ * CORRECTO: Una sola función, MISMO código Drizzle para ambas BDs
+ */
+export async function insertProductDual(data: NewProduct): Promise<Product> {
+  return executeDual(async (db) => {
+    const [product] = await db
+      .insert(products)
+      .values(data)
+      .returning();
+    return product;
+  });
+}
+
+export async function updateProductDual(
+  id: string, 
+  data: Partial<NewProduct>
+): Promise<Product> {
+  return executeDual(async (db) => {
+    const [product] = await db
+      .update(products)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(products.id, id))
+      .returning();
+    return product;
+  });
+}
+
+export async function getProductByBarcode(barcode: string): Promise<Product | undefined> {
+  // Operaciones de lectura SOLO en local (más rápido)
+  return await libsqlClient
+    .select()
+    .from(products)
+    .where(eq(products.barcode, barcode))
+    .limit(1)
+    .then(rows => rows[0]);
+}
+```
+
+#### Ventajas de este Patrón:
+1. **DRY (Don't Repeat Yourself)**: Una sola definición de la operación
+2. **Consistencia Garantizada**: Misma lógica en ambas BDs
+3. **Fácil Mantenimiento**: Cambios en un solo lugar
+4. **Type Safety**: TypeScript valida la operación una sola vez
+5. **Performance**: Operación local no espera a la cloud
+
+#### Reglas de Oro:
+- **ESCRITURAS**: Siempre usar `executeDual()` (local + cloud)
+- **LECTURAS**: Solo local (libsqlClient directo) - más rápido
+- Una función `executeDual()` genérica que recibe operaciones Drizzle
+- NUNCA duplicar código de consultas Drizzle
+- NUNCA escribir SQL raw diferente para cada BD
+
+#### Ejemplo de Uso en Componentes:
+```typescript
+// components/pos/add-product-form.tsx
+'use client';
+
+import { insertProductDual } from '@/lib/db/dual-ops';
+
+export function AddProductForm() {
+  const handleSubmit = async (data: NewProduct) => {
+    // Una sola función, escribe en ambas BDs
+    const product = await insertProductDual(data);
+    // UI se actualiza instantáneamente con resultado local
+    toast.success('Producto agregado');
+  };
+
+  return <form onSubmit={handleSubmit}>...</form>;
+}
 ```
 
 ### Schema Conventions
-- Use `text` primary keys with UUID generation
+- Use `text` primary keys with ULID generation (better than UUID for sorting)
 - Include `createdAt`, `updatedAt`, `deletedAt` timestamps
-- Use enums for status fields: `{ enum: ['value1', 'value2'] }`
-- Add sync metadata: `synced`, `lastSyncedAt`
+- Use enums for status fields: `{ enum: ['active', 'inactive'] }`
+- Add sync metadata: `synced`, `lastSyncedAt`, `deviceId`
+- Add indexes for barcode, SKU, and frequently searched fields
 
 ## Testing Standards
 
 ### Test Structure
 - Mirror `src/` structure in `__tests__/`
-- Use descriptive test names: `should handle click with loading state`
+- Use descriptive test names: `should process checkout in under 100ms`
 - Test all component states: default, loading, error, success
 - Include accessibility tests
+- **Performance tests**: Critical for POS operations
 
 ### Testing Patterns
-- Mirror `src/` structure in `__tests__/` directory
-- Use descriptive test names: `should handle click with loading state`
-- Test all component states: default, loading, error, success
-- Include accessibility tests with proper ARIA roles
-- Test user interactions with `@testing-library/user-event`
-- Mock Web Workers, IndexedDB, and external APIs in `setup.ts`
-- Target >90% code coverage with `npm run test:coverage`
-
 ```typescript
-// ✅ Good - Complete component test
-describe('ProductCard', () => {
-  it('should render product information correctly', () => {
-    const mockProduct: Product = {
-      id: 'woo-123',
-      name: 'Test Product', 
-      price: 100,
-      stock: 5,
-      imageThumb: 'https://example.com/thumb.webp',
-      imageMedium: 'https://example.com/medium.webp'
-    };
+// ✅ Good - Performance test for critical operation
+describe('CheckoutFlow', () => {
+  it('should complete checkout in under 200ms', async () => {
+    const startTime = performance.now();
     
-    render(<ProductCard product={mockProduct} onAdd={vi.fn()} />);
+    const { result } = renderHook(() => useCheckout());
     
-    expect(screen.getByText('Test Product')).toBeInTheDocument();
-    expect(screen.getByText('$100')).toBeInTheDocument();
-    expect(screen.getByRole('img')).toHaveAttribute('src', mockProduct.imageMedium);
-  });
-
-  it('should handle add to cart interaction', async () => {
-    const mockOnAdd = vi.fn();
-    const user = userEvent.setup();
-    
-    render(<ProductCard product={mockProduct} onAdd={mockOnAdd} />);
-    
-    const addButton = screen.getByRole('button', { name: /agregar al carrito/i });
-    await user.click(addButton);
-    
-    expect(mockOnAdd).toHaveBeenCalledWith(mockProduct);
-    expect(mockOnAdd).toHaveBeenCalledTimes(1);
-  });
-
-  it('should show out of stock state', () => {
-    const outOfStockProduct = { ...mockProduct, stock: 0, stockStatus: 'outofstock' };
-    
-    render(<ProductCard product={outOfStockProduct} onAdd={vi.fn()} />);
-    
-    expect(screen.getByText(/agotado/i)).toBeInTheDocument();
-    expect(screen.getByRole('button')).toBeDisabled();
-  });
-
-  it('should handle image loading errors', async () => {
-    const productWithBrokenImage = { ...mockProduct, imageMedium: 'broken-url' };
-    
-    render(<ProductCard product={productWithBrokenImage} onAdd={vi.fn()} />);
-    
-    const image = screen.getByRole('img');
-    fireEvent.error(image);
-    
-    // Should fallback to imageOriginal or placeholder
-    expect(image).toHaveAttribute('src', expect.not.stringMatching('broken-url'));
-  });
-});
-
-// ✅ Good - Hook testing
-describe('usePosCart', () => {
-  it('should add product to cart', () => {
-    const { result } = renderHook(() => usePosCart());
-    
-    act(() => {
-      result.current.addToCart(mockProduct);
+    await act(async () => {
+      await result.current.processCheckout(mockCart);
     });
     
-    expect(result.current.items).toHaveLength(1);
-    expect(result.current.total).toBe(100);
+    const duration = performance.now() - startTime;
+    expect(duration).toBeLessThan(200);
   });
-});
 
-// ✅ Good - Database operation testing  
-describe('dual-db-operations', () => {
-  it('should handle offline scenario gracefully', async () => {
-    // Mock cloud DB failure
-    vi.mocked(cloudDb.insert).mockRejectedValue(new Error('Network error'));
+  it('should work offline', async () => {
+    // Simulate offline
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     
-    const product = await insertProductDual(mockProductData);
+    const { result } = renderHook(() => useCheckout());
     
-    expect(product).toBeDefined();
-    expect(product.synced).toBe(false); // Not synced due to cloud failure
+    await act(async () => {
+      await result.current.processCheckout(mockCart);
+    });
+    
+    expect(result.current.invoice).toBeDefined();
+    expect(result.current.syncStatus).toBe('queued');
   });
 });
 ```
 
-### Mock Setup
-- Use comprehensive mocks in `setup.ts`
-- Mock IndexedDB, Workers, and external APIs
-- Export reusable mock objects for test files
-
 ## Performance Guidelines
 
-### Optimization Strategies
-- Use `React.memo` for components that receive stable props
-- Implement `useCallback` for event handlers passed to child components
-- Use `useMemo` for expensive calculations
-- Implement proper image optimization with Next.js Image component
+### Critical Optimizations for POS
+1. **Product Search**:
+   - Use Fuse.js or similar for fuzzy search
+   - Index by: name, barcode, SKU, category
+   - Keep index in memory
+   - Update index on background thread
+
+2. **Cart Operations**:
+   - Keep cart in memory (not IndexedDB for every update)
+   - Use Zustand or similar for cart state
+   - Persist to libSQL only on checkout
+
+3. **Invoice Generation**:
+   - Use Web Worker to avoid blocking UI
+   - Pre-render common invoice templates
+   - Generate PDF in background
+
+4. **Image Loading**:
+   - Tiny thumbnails (< 5KB) for product list
+   - Lazy load product detail images
+   - Use Cloudflare R2 transforms for optimization
 
 ### Bundle Optimization
-- Use dynamic imports for heavy components
-- Implement code splitting at route level
+- Dynamic imports for admin/settings (not critical path)
+- Code split by route
+- Preload checkout flow components
 - Use Web Workers for CPU-intensive operations
-- Optimize images with Cloudflare R2 transformations
 
 ## Cloudflare Integration
 
@@ -264,12 +412,33 @@ describe('dual-db-operations', () => {
 - Use WebP format for better compression
 - Implement lazy loading with Next.js Image
 - Include fallback URLs for offline scenarios
+- **Optimization**: Serve optimized images from R2 CDN
 
-### Pages Deployment
-- Static export configuration in `next.config.ts`
-- Custom headers in `public/_headers`
-- Environment variables via Cloudflare dashboard
-- Automatic deployment via GitHub Actions
+## Vercel Deployment
+
+### Why Vercel?
+- Built by Next.js creators (optimal integration)
+- Edge network for low latency across Latinoamérica
+- Automatic preview deployments
+- Superior developer experience
+
+### Configuration
+```typescript
+// next.config.ts
+export default {
+  reactStrictMode: true,
+  swcMinify: true,
+  images: {
+    domains: ['r2.posveci.com'],
+    formats: ['image/webp', 'image/avif'],
+  },
+  // Hybrid rendering for optimal performance
+  experimental: {
+    optimizeCss: true,
+    optimizePackageImports: ['@/components/ui'],
+  },
+};
+```
 
 ## Security Best Practices
 
@@ -290,63 +459,30 @@ describe('dual-db-operations', () => {
 ### Scripts Usage
 ```bash
 # Development
-npm run dev              # Start with worker compilation
-npm run dev:next         # Next.js only (faster for UI work)
-npm run build:worker     # Compile SQLite worker only
+npm run dev          # Start Next.js + compile workers
+npm run dev:fast     # Next.js only (UI work)
 
-# Database Management
-npm run db:generate      # Generate Drizzle migrations
-npm run db:migrate       # Apply migrations to Turso
-npm run db:studio        # Open Drizzle Studio
-npm run db:seed          # Seed database with test data
+# Database
+npm run db:generate  # Generate Drizzle migrations
+npm run db:migrate:local # Apply migrations to libSQL
+npm run db:migrate:turso # Apply migrations to Turso
+npm run db:studio    # Open Drizzle Studio
 
-# Testing & Quality
-npm test                 # Run Vitest tests
-npm run test:ci          # Run tests in CI mode
-npm run test:watch       # Watch mode for development
-npm run test:coverage    # Generate coverage report (>90% target)
-npm run lint             # ESLint analysis
-npm run type-check       # TypeScript validation
+# Testing
+npm test             # Run all tests
+npm run test:watch   # Watch mode
+npm run test:perf    # Performance benchmarks
+npm run test:coverage # Coverage report (target: >90%)
 
 # Build & Deploy
-npm run build            # Production build with static export
-npm run build:cf         # Cloudflare-specific build
-npm run pages:deploy     # Deploy to Cloudflare Pages
-npm run preview          # Preview deployment locally
-npm run verify:cf        # Verify Cloudflare deployment
-
-# Data Management
-npm run migrate:images   # Migrate images to R2
-npm run sync:woo         # Manual WooCommerce sync
-npm run test:r2          # Test R2 connection
-```
-
-### Development Workflow
-```bash
-# 1. Start development
-npm run dev              # Compiles worker + starts Next.js
-
-# 2. Make changes to components
-npm run dev:next         # Faster reload for UI work
-
-# 3. Test changes
-npm run test:watch       # Auto-run tests
-npm run lint             # Check code quality
-
-# 4. Database changes
-npm run db:generate      # Create migration
-npm run db:migrate       # Apply to Turso
-npm run db:studio        # Visual DB browser
-
-# 5. Deploy
-npm run build            # Static export
-npm run pages:deploy     # To Cloudflare Pages
+npm run build        # Production build
+npm run deploy       # Deploy to Vercel
 ```
 
 ### Git Workflow
-- Use conventional commits: `feat:`, `fix:`, `test:`, `docs:`
-- Create feature branches: `feature/new-feature-name`
-- Include tests with all PRs
+- Use conventional commits: `feat:`, `fix:`, `perf:`, `test:`
+- Create feature branches: `feature/fast-checkout`
+- **Always include performance impact** in PR description
 - Update documentation for significant changes
 
 ## Cloudflare Integration
@@ -373,20 +509,20 @@ npm run pages:deploy     # To Cloudflare Pages
 
 ### Required Environment Variables
 ```bash
-# Turso Database (Primary Cloud DB)
-TURSO_DATABASE_URL=          # Turso database URL
-TURSO_AUTH_TOKEN=           # Turso auth token
+# Turso Database (Backend)
+TURSO_DATABASE_URL=    # Turso database URL
+TURSO_AUTH_TOKEN=      # Turso auth token
 
-# Cloudflare R2 (Image Storage)
-R2_ACCESS_KEY_ID=           # R2 access key
-R2_SECRET_ACCESS_KEY=       # R2 secret key
-R2_BUCKET_NAME=             # R2 bucket name (e.g., pos-miniveci-images)
-R2_ENDPOINT=                # R2 endpoint URL
+# Cloudflare R2 (Images)
+R2_ACCESS_KEY_ID=      # R2 access key
+R2_SECRET_ACCESS_KEY=  # R2 secret key
+R2_BUCKET_NAME=        # R2 bucket name
+R2_ENDPOINT=           # R2 endpoint URL
+R2_PUBLIC_URL=         # Public CDN URL
 
-# WooCommerce Integration (Optional)
-WOO_URL=                    # WooCommerce site URL
-WOO_KEY=                    # WooCommerce API key
-WOO_SECRET=                 # WooCommerce API secret
+# App Config
+NEXT_PUBLIC_APP_URL=   # https://posveci.com
+NEXT_PUBLIC_API_URL=   # API endpoint
 ```
 
 ### Database Schema
@@ -689,5 +825,87 @@ function ProductImage({ product }: { product: Product }) {
 3. `npm run dev` - Start development server
 4. `npm run test` - Verify everything works
 5. Check `http://localhost:3000` - POS interface should load
+
+## Common Patterns
+
+### Custom Hooks for POS Operations
+```typescript
+// hooks/use-pos-cart.ts
+export function usePOSCart() {
+  const addItem = useCallback((product: Product, quantity = 1) => {
+    // Optimistic update - instant UI feedback
+    setCart(prev => [...prev, { product, quantity }]);
+    
+    // Background persistence (no await - don't block UI)
+    persistCartToLibSQL(cart).catch(console.error);
+  }, []);
+
+  return { cart, addItem, removeItem, clear };
+}
+```
+
+### Error Handling
+- Use try/catch blocks for async operations
+- Provide fallback UI for error states
+- Log errors for debugging
+- Show user-friendly error messages in Spanish
+
+### Offline Support
+- Check network state with `useNetworkState` hook
+- Queue operations when offline
+- Sync automatically when online
+- Provide offline indicators to users
+- **Critical**: POS must work 100% offline
+
+## Localization (Spanish for Latin America)
+- All UI text in Spanish
+- Currency: Support CLP (Chile), USD, and other LATAM currencies
+- Date format: DD/MM/YYYY
+- Number format: Use dot for thousands, comma for decimals (Chilean standard)
+
+## Best Practices Summary
+
+### Code Quality
+- TypeScript strict mode always
+- Comprehensive tests (>90% coverage)
+- Document complex functions with JSDoc
+- ESLint + Prettier for consistency
+
+### Performance (CRITICAL)
+- **Every millisecond counts in checkout flow**
+- Optimize images and lazy load content
+- Use memoization aggressively
+- Implement proper caching strategies
+- Monitor bundle size and Core Web Vitals
+- **Benchmark against competitor "Desing"** - we must be faster
+
+### User Experience
+- Design offline-first interactions
+- Provide **instant** feedback for actions
+- Use skeleton screens for loading states
+- Implement proper error boundaries
+- Keyboard shortcuts for power users
+- **Zero tolerance for lag** in critical operations
+
+---
+
+## INSTRUCCIONES PARA ROVO/CLINE
+
+Al trabajar en este proyecto:
+
+1. **PRIORIZA VELOCIDAD**: Si tienes que elegir entre una feature linda y una rápida, elige rápida.
+2. **PIENSA LOCAL-FIRST**: Toda operación crítica debe funcionar offline.
+3. **MIDE PERFORMANCE**: Usa `performance.now()` para medir operaciones críticas.
+4. **OPTIMIZA AGRESIVAMENTE**:
+   - Memoiza todo en componentes POS
+   - Usa Web Workers para operaciones pesadas
+   - Mantén datos calientes en memoria
+5. **TESTING EXHAUSTIVO**:
+   - Tests unitarios para lógica de negocio
+   - Tests de integración para flujos completos
+   - Tests de performance para operaciones críticas
+   - Tests offline para sincronización
+6. **DOCUMENTA DECISIONES**: Especialmente decisiones de performance y arquitectura.
+7. **ESPAÑOL**: Toda la UI y mensajes deben estar en español (es para Latinoamérica).
 
 *Keep this guide updated as the project evolves. Document new patterns and architectural decisions.*
