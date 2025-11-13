@@ -31,18 +31,17 @@ export const cloudDb = {
   },
 
   // Get product by ID
-  async getProduct(id: number): Promise<Product | null> {
+  async getProduct(id: string): Promise<Product | null> {
     if (!db) throw new Error('Cloud database not initialized');
     const result = await db.select().from(products).where(eq(products.id, id));
     return result[0] || null;
   },
 
   // Insert new product
-  async insertProduct(data: Omit<NewProduct, 'id' | 'synced'>): Promise<Product> {
+  async insertProduct(data: Omit<NewProduct, 'id'>): Promise<Product> {
     if (!db) throw new Error('Cloud database not initialized');
     const result = await db.insert(products).values({
       ...data,
-      synced: 1, // Cloud records are always synced
     }).returning();
     const row = result[0];
     if (!row) throw new Error('Insert product failed');
@@ -50,13 +49,12 @@ export const cloudDb = {
   },
 
   // Update product
-  async updateProduct(id: number, data: Partial<Omit<Product, 'id'>>): Promise<Product> {
+  async updateProduct(id: string, data: Partial<Omit<Product, 'id'>>): Promise<Product> {
     if (!db) throw new Error('Cloud database not initialized');
     const result = await db.update(products)
       .set({
         ...data,
         updatedAt: new Date(),
-        synced: 1,
       })
       .where(eq(products.id, id))
       .returning();
@@ -69,15 +67,14 @@ export const cloudDb = {
   async upsertProduct(product: Product): Promise<Product> {
     if (!db) throw new Error('Cloud database not initialized');
 
-    const existing = await this.getProduct(product.id!);
+    const existing = await this.getProduct(product.id);
 
     if (existing) {
-      return this.updateProduct(product.id!, product);
+      return this.updateProduct(product.id, product);
     } else {
       // For upsert, we want to keep the original ID
       const result = await db.insert(products).values({
         ...product,
-        synced: 1,
       }).returning();
       const row = result[0];
       if (!row) throw new Error('Upsert product insert failed');
@@ -86,7 +83,7 @@ export const cloudDb = {
   },
 
   // Delete product
-  async deleteProduct(id: number): Promise<void> {
+  async deleteProduct(id: string): Promise<void> {
     if (!db) throw new Error('Cloud database not initialized');
     await db.delete(products).where(eq(products.id, id));
   },
@@ -111,7 +108,6 @@ export const cloudDb = {
     if (!db) throw new Error('Cloud database not initialized');
     const result = await db.insert(sales).values({
       ...data,
-      synced: 1, // Cloud records are always synced
     }).returning();
     const row = result[0];
     if (!row) throw new Error('Insert sale failed');
@@ -146,7 +142,6 @@ export const cloudDb = {
       .set({
         ...data,
         updatedAt: new Date(),
-        synced: 1,
       })
       .where(eq(sales.id, id))
       .returning();
@@ -159,7 +154,7 @@ export const cloudDb = {
   async deleteSale(id: string): Promise<void> {
     if (!db) throw new Error('Cloud database not initialized');
     await db.update(sales)
-      .set({ deletedAt: new Date() })
+      .set({ updatedAt: new Date() })
       .where(eq(sales.id, id));
   },
 
@@ -170,7 +165,6 @@ export const cloudDb = {
     if (!db) throw new Error('Cloud database not initialized');
     const result = await db.insert(saleItems).values({
       ...data,
-      synced: 1, // Cloud records are always synced
     }).returning();
     const row = result[0];
     if (!row) throw new Error('Insert sale item failed');

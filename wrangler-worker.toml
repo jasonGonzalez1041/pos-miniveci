@@ -1,0 +1,43 @@
+# Configuración de Cloudflare Worker para Cache R2
+# Archivo separado para el worker de cache de imágenes
+
+name = "pos-miniveci-r2-cache"
+main = "src/workers/r2-cache-worker.ts"
+compatibility_date = "2024-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Variables de entorno para el worker
+[env.production.vars]
+CACHE_TTL = "31536000"  # 1 año
+FALLBACK_IMAGE_URL = "https://miniveci.cl/wp-content/uploads/placeholder-product.webp"
+
+[env.staging.vars]
+CACHE_TTL = "3600"      # 1 hora para testing
+FALLBACK_IMAGE_URL = "https://staging.miniveci.cl/placeholder.webp"
+
+# Binding al bucket R2
+[[env.production.r2_buckets]]
+binding = "MINIVECI_BUCKET"
+bucket_name = "pos-miniveci-bucket"
+
+[[env.staging.r2_buckets]]
+binding = "MINIVECI_BUCKET"  
+bucket_name = "pos-miniveci-bucket-staging"
+
+# Rutas personalizadas (custom domains)
+[env.production.routes]
+pattern = "cdn.miniveci.cl/*"
+custom_domain = true
+
+[env.staging.routes]
+pattern = "staging-cdn.miniveci.cl/*"
+custom_domain = true
+
+# Configuración de recursos
+[env.production]
+workers_dev = false
+zone_name = "miniveci.cl"
+
+[env.staging]
+workers_dev = true
+zone_name = "miniveci.cl"
