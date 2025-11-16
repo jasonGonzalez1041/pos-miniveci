@@ -4,8 +4,8 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { getLocalDb } from './local-db';
-import { getCloudDb } from './cloud-db';
+import { initLocalDb } from './local-db';
+import { cloudDb } from './cloud-db';
 import { syncMetadata } from './schema';
 import type { SyncMetadata } from '../sync/types';
 
@@ -16,7 +16,7 @@ const SINGLETON_ID = 'singleton';
  */
 export async function getSyncMetadata(): Promise<SyncMetadata | null> {
   try {
-    const localDb = await getLocalDb();
+    const localDb = await initLocalDb();
     const result = await localDb
       .select()
       .from(syncMetadata)
@@ -48,12 +48,12 @@ export async function initSyncMetadata(): Promise<SyncMetadata> {
   };
 
   try {
-    const localDb = await getLocalDb();
+    const localDb = await initLocalDb();
     await localDb.insert(syncMetadata).values(newMetadata);
     
     // Sync to cloud
     try {
-      const cloudDb = getCloudDb();
+      const cloudDb = cloudDb();
       await cloudDb.insert(syncMetadata).values(newMetadata);
     } catch (cloudError) {
       console.warn('⚠️ Cloud sync metadata init failed:', cloudError);
@@ -74,7 +74,7 @@ export async function updateLastSyncTimestamp(timestamp: Date): Promise<void> {
   try {
     await initSyncMetadata(); // Ensure exists
     
-    const localDb = await getLocalDb();
+    const localDb = await initLocalDb();
     await localDb
       .update(syncMetadata)
       .set({
@@ -85,7 +85,7 @@ export async function updateLastSyncTimestamp(timestamp: Date): Promise<void> {
     
     // Sync to cloud
     try {
-      const cloudDb = getCloudDb();
+      const cloudDb = cloudDb();
       await cloudDb
         .update(syncMetadata)
         .set({
@@ -110,7 +110,7 @@ export async function updateLastFullSyncTimestamp(timestamp: Date): Promise<void
   try {
     await initSyncMetadata();
     
-    const localDb = await getLocalDb();
+    const localDb = await initLocalDb();
     await localDb
       .update(syncMetadata)
       .set({
@@ -121,7 +121,7 @@ export async function updateLastFullSyncTimestamp(timestamp: Date): Promise<void
     
     // Sync to cloud
     try {
-      const cloudDb = getCloudDb();
+      const cloudDb = cloudDb();
       await cloudDb
         .update(syncMetadata)
         .set({
@@ -149,7 +149,7 @@ export async function incrementPendingChanges(count = 1): Promise<void> {
     const current = await getSyncMetadata();
     const newCount = (current?.pendingChanges || 0) + count;
     
-    const localDb = await getLocalDb();
+    const localDb = await initLocalDb();
     await localDb
       .update(syncMetadata)
       .set({
@@ -171,7 +171,7 @@ export async function resetPendingChanges(): Promise<void> {
   try {
     await initSyncMetadata();
     
-    const localDb = await getLocalDb();
+    const localDb = await initLocalDb();
     await localDb
       .update(syncMetadata)
       .set({
@@ -182,7 +182,7 @@ export async function resetPendingChanges(): Promise<void> {
     
     // Sync to cloud
     try {
-      const cloudDb = getCloudDb();
+      const cloudDb = cloudDb();
       await cloudDb
         .update(syncMetadata)
         .set({
